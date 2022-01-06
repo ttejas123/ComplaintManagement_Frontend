@@ -2,10 +2,14 @@ import fetch from 'node-fetch'
 import express from 'express'
 import mongoose from 'mongoose';
 const app = express();
+import path from 'path';
 // const fetch = require('node-fetch');
 import fs from 'fs'
 import fileUpload from './fileUpload.js'
 import cors  from 'cors';
+import csvUpload from './csvUpload.js'
+import insertManyDJ  from './insertMany.js'
+import csv from 'csvtojson'
 const port = process.env.PORT || 3001;
 //provide schema for dataBase
 import userModel  from "./models/UserData.js"
@@ -30,7 +34,7 @@ db.on('error', (error) => console.error("Error Occure ----> "+ error))
 db.once('open', ()=> console.log('connected to database'))
 
 //get all info of specific doc by ID Middalware
-async function getSubscriber(req, res, next) {
+async function getUserById(req, res, next) {
 	let subscriber
 	try {
 		subscriber = await userModel.findById(req.params.id)
@@ -157,8 +161,59 @@ app.get('/read', async (req, res)=>{
 	})
 })
 
-app.patch('/readOne/:id', getSubscriber, async (req, res)=>{
+//csvUpload.single('csvFile'), 
+app.post('/csvFile', csvUpload.single('csvFile'), async (req, res) => {
+	const pathChange = path.resolve()
+	
+	const PathOfCsv = pathChange.toString() + '\\upload\\csv\\' + req.file.filename
+	console.log(PathOfCsv)
+	csv()
+	.fromFile(PathOfCsv)
+	.then( async (jsonObj)=>{
+	   console.log(jsonObj)
+	   const Check = await insertManyDJ(req, res, jsonObj, userModel) 
+	   if(Check) {
+	   	fs.unlink(PathOfCsv, (err) => {
+	   		  if (err) {
+	   		  	console.log(err);
+			 } else {
+			    console.log(`\nDeleted file: ${req.file.filename}`);
+			  }
+	   	})
+	   	res.status(201).json({inseredData: Check})
+	   }else {
+	   	res.status(500).json({message: "UnScessful"})
+	   }
+	})
+})
+
+app.patch('/readOne/:id', getUserById, async (req, res)=>{
 	res.json(res.subscriber)
+})
+
+//delete Many
+app.post('/deleteManyById', async (req, res) => {
+	const id = req.body.deleteManyById
+	try {
+		const manyDelete = await userModel.deleteMany({
+														    "_id": {
+														        "$in": id
+														        }
+														 }) 
+		console.log(manyDelete)
+		res.status(201).json(manyDelete)
+	} catch (e) {
+		res.status(500).json({message: e.message})
+	}
+})
+
+app.post('/find', async (req, res) => {
+	try{
+		const find = await user.find({$text: {$search: req.body.find}})
+		res.status(202).json({data: find})
+	}catch(e){
+		res.status(404).json({message: e.message})
+	}
 })
 
 
